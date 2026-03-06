@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Electoral Cloud - C.A.Q.</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --primary-green: #006837; --light-green: #e8f5e9; --danger: #d32f2f; --text-dark: #333; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; color: var(--text-dark); }
+        
+        /* Login Screen */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary-green); z-index: 5000; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; }
+        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; color: var(--text-dark); width: 100%; max-width: 350px; }
+        .login-box input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary-green); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1.1rem; }
+        
+        /* Header y general */
+        header { background-color: white; border-bottom: 4px solid var(--primary-green); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-placeholder { width: 50px; height: 50px; background-color: var(--light-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary-green); font-size: 20px; border: 2px solid var(--primary-green); }
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card-header { font-size: 1.1rem; font-weight: 600; color: var(--primary-green); margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Botones */
+        .btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+        .btn-primary { background: var(--primary-green); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary-green); color: var(--primary-green); }
+        .btn-clean { background: #78909c; color: white; }
+        
+        /* UI */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--primary-green); color: white; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-card.secondary { background: white; color: var(--primary-green); border: 1px solid var(--primary-green); }
+        .stat-number { font-size: 2rem; font-weight: bold; display: block; }
+        
+        .voting-interface { display: flex; gap: 15px; align-items: flex-end; background: var(--light-green); padding: 20px; border-radius: 8px; }
+        .input-group { display: flex; flex-direction: column; flex: 1; }
+        .input-group input, .input-group select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; position: sticky; top: 0; }
+        .status-voted { color: var(--primary-green); font-weight: bold; }
+        .status-pending { color: var(--danger); }
+        tr.row-voted { background-color: rgba(76, 175, 80, 0.1); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; display: none; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 800px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;}
+        .modal-header { font-size: 1.2rem; font-weight: bold; color: var(--primary-green); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .chart-box { position: relative; height: 40vh; min-height: 300px; width: 100%; margin: 0 auto; }
+        .hidden { display: none !important; }
+        #liveBadge { background: #d32f2f; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; animation: blink 2s infinite; margin-left: 10px; vertical-align: middle; }
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
+        
+        /* Inputs escrutinio */
+        .config-listas { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+        .input-escrutinio { width: 70px; padding: 5px; border: 1px solid #ccc; text-align: center; }
+        .escrutinio-total { font-weight: bold; background: #eee; }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay">
+    <div style="font-size: 4rem; margin-bottom: 20px;"><i class="fas fa-balance-scale"></i></div>
+    <h2>Colegio de Abogados de Quilmes</h2>
+    <div class="login-box">
+        <h3>Acceso al Sistema</h3>
+        <input type="email" id="email" placeholder="Usuario (Ej: admin@caq.com)">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button onclick="iniciarSesion()">INGRESAR</button>
+        <div id="loginError" style="color: red; margin-top: 10px; font-size: 0.9rem; font-weight: bold;"></div>
+    </div>
+</div>
+
+<header>
+    <div class="logo-area">
+        <div class="logo-placeholder"><i class="fas fa-balance-scale"></i></div>
+        <div>
+            <h1 style="display:flex; align-items:center;">Elecciones C.A.Q. <span id="liveBadge">EN VIVO</span></h1>
+            <h2>Usuario: <span id="userRoleDisplay" style="font-weight:bold; color:var(--primary-green);">Cargando...</span></h2>
+        </div>
+    </div>
+    <div>
+        <button class="btn btn-clean" onclick="cerrarSesion()"><i class="fas fa-sign-out-alt"></i> Salir</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card" style="background: #f1f8e9; border: 1px solid #c5e1a5;">
+        <div class="card-header" style="border:none; margin:0; padding:0;">
+            <span><i class="fas fa-chart-line"></i> Acciones y Tableros</span>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="abrirModalParciales()"><i class="fas fa-chart-pie"></i> Parciales</button>
+                <button class="btn btn-primary" onclick="abrirModalReferentes()"><i class="fas fa-users"></i> Referentes</button>
+                <button class="btn btn-danger" id="btnMenuEscrutinio" onclick="abrirModalFinal()"><i class="fas fa-flag-checkered"></i> ESCRUTINIO FINAL</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="moduloCargaExcel">
+        <div class="card-header">
+            <span><i class="fas fa-cloud-upload-alt"></i> Carga de Padrones al Servidor (Solo Admin)</span>
+            <button class="btn btn-outline" style="padding: 5px 10px; font-size:0.8rem;" onclick="limpiarNube()">Limpiar Nube</button>
+        </div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+            <label class="btn btn-outline" style="flex:1; padding:20px; border-style:dashed; text-align:center; cursor: pointer;">
+                <i class="fas fa-file-excel fa-2x"></i><br>Cargar Padrón Completo <input type="file" style="display:none" accept=".xlsx, .xls" onchange="handleFile(this, 'padron')">
+            </label>
+            <label class="btn btn-outline" style="flex:1; padding:20px; border-style:dashed; text-align:center; cursor: pointer;">
+                <i class="fas fa-file-excel fa-2x"></i><br>Cargar Lista Verde <input type="file" style="display:none" accept=".xlsx, .xls" onchange="handleFile(this, 'verdes')">
+            </label>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card secondary"><span class="stat-number" id="statTotalPadron">0</span><span class="stat-label">Padrón Total</span></div>
+        <div class="stat-card"><span class="stat-number" id="statTotalVerdes">0</span><span class="stat-label">Obj. Lista Verde</span></div>
+        <div class="stat-card secondary" style="border-color:var(--accent-green); color:var(--accent-green);"><span class="stat-number" id="statYaVotaron">0</span><span class="stat-label">Votos Verdes (Proyección)</span></div>
+        <div class="stat-card" style="background: var(--danger);"><span class="stat-number" id="statFaltan">0</span><span class="stat-label">Faltan Votar</span></div>
+    </div>
+
+    <div class="card" id="moduloCargaVotos">
+        <div class="card-header">
+            <span><i class="fas fa-box-open"></i> Mesa de Entrada (Cargar Votante)</span>
+            <button class="btn btn-outline" onclick="toggleCorrectionMode()" id="btnCorrection"><i class="fas fa-edit"></i> Corregir Voto</button>
+        </div>
+        <div class="voting-interface">
+            <div class="input-group"><label>Tomo</label><select id="inputTomo"><option value="">Tomo</option></select></div>
+            <div class="input-group"><label>Folio</label><input type="number" id="inputFolio" placeholder="Ej: 123" onkeypress="handleEnter(event)"></div>
+            <button class="btn btn-primary" id="btnCargarVoto" onclick="registrarVoto()">CARGAR VOTO</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display:flex; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
+            <input type="text" id="searchInput" placeholder="Buscar Apellido, Folio..." onkeyup="renderTabla()" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <select id="filterReferente" onchange="renderTabla()" style="padding:10px; border:1px solid #ccc; border-radius:4px;"><option value="">Todos los Referentes</option></select>
+            <select id="filterEstado" onchange="renderTabla()" style="padding:10px; border:1px solid #ccc; border-radius:4px;"><option value="pendiente">Faltan Votar</option><option value="voto">Ya Votaron</option><option value="">Todos</option></select>
+        </div>
+        <div style="overflow-x: auto; max-height: 500px;">
+            <table id="tablaVotos">
+                <thead><tr><th>Estado</th><th>Tomo</th><th>Folio</th><th>Nombre</th><th>Referente(s)</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalParciales">
+    <div class="modal-content">
+        <div class="modal-header">Resultados Parciales<button class="btn btn-outline" style="padding:2px 8px;" onclick="document.getElementById('modalParciales').style.display='none'">X</button></div>
+        <div style="text-align:center;">
+            <h3>Total Emitidos en Mesa: <span id="parcialTotalEmitidos" style="color:blue">0</span></h3>
+            <h4>De los cuales son Verdes (Est.): <span id="parcialVerdes" style="color:var(--primary-green)">0</span></h4>
+        </div>
+        <div class="chart-box"><canvas id="chartParcial"></canvas></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalReferentes">
+    <div class="modal-content">
+        <div class="modal-header">Efectividad por Referente<button class="btn btn-outline" style="padding:2px 8px;" onclick="document.getElementById('modalReferentes').style.display='none'">X</button></div>
+        <div style="overflow-x:auto;">
+            <table id="tablaReferentes"><thead><tr><th>Referente</th><th>Total</th><th>Votaron</th><th>Faltan</th></tr></thead><tbody></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalFinal">
+    <div class="modal-content">
+        <div class="modal-header">Escrutinio Final (Matriz)<button class="btn btn-outline" style="padding:2px 8px;" onclick="document.getElementById('modalFinal').style.display='none'">X</button></div>
+        
+        <div id="moduloCargaEscrutinio">
+            <p>Configura las listas y abre la matriz. (Lo que escribas se guardará en la nube automáticamente).</p>
+            <div class="config-listas" id="configListasContainer"></div>
+            <button class="btn btn-outline btn-sm" onclick="agregarConfigLista()" id="btnAñadirLista">+ Agregar Lista Opositora</button>
+            <button class="btn btn-primary btn-sm" onclick="generarTablaEscrutinio()">Abrir Matriz de Carga</button>
+            
+            <div id="containerTablaEscrutinio" style="display:none; margin-top:20px; overflow-x:auto;">
+                <table id="tablaEscrutinio"><thead></thead><tbody></tbody></table>
+                <div style="background:#e8f5e9; padding:10px; text-align:right; margin-top:10px;">
+                    <h3>Total General: <span id="totalGeneralEscrutinio">0</span></h3>
+                </div>
+                <button class="btn btn-danger" style="width:100%; margin-top:15px;" onclick="calcularResultadoFinal()">VER RESULTADO FINAL Y GRÁFICOS</button>
+            </div>
+        </div>
+
+        <div id="stepResultadoFinal" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+            <div class="chart-box"><canvas id="chartFinal"></canvas></div>
+            <div id="resumenFinalTexto" style="margin:10px 0; font-weight:bold; text-align:center;"></div>
+            <div style="margin-top:auto; padding-top:10px; border-top:1px solid #eee;">
+                <button class="btn btn-outline" style="width:100%;" onclick="volverATabla()"><i class="fas fa-arrow-left"></i> Volver a la Matriz (Editar)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" style="position:fixed; bottom:20px; right:20px; background:#333; color:white; padding:15px; border-radius:5px; display:none; z-index:9000; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"></div>
+
+<script>
+    // ==========================================
+    // TUS CREDENCIALES EXACTAS DE FIREBASE
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyDLbdGI0iYGu2ADkdX_PMWWUhWG5Dxjucg",
+      authDomain: "eleccionescaq.firebaseapp.com",
+      databaseURL: "https://eleccionescaq-default-rtdb.firebaseio.com",
+      projectId: "eleccionescaq",
+      storageBucket: "eleccionescaq.firebasestorage.app",
+      messagingSenderId: "934632456972",
+      appId: "1:934632456972:web:5087dea53456aa2932ff29"
+    };
+    
+    // Inicializar Firebase
+    try {
+        firebase.initializeApp(firebaseConfig);
+        console.log("Firebase inicializado correctamente.");
+    } catch(e) {
+        alert("Fallo crítico al cargar Firebase. Revisa tu conexión a internet.");
+    }
+    
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    Chart.register(ChartDataLabels);
+
+    // Variables Globales
+    let userRole = null; 
+    let padronData = [];
+    let votosVerdesData = [];
+    let votosEmitidos = new Set();
+    let listaTomos = new Set();
+    let listaReferentes = new Set();
+    let isCorrectionMode = false;
+    let chartParcialInstance = null;
+    let chartFinalInstance = null;
+    let listasConfig = [ { id: 0, nombre: "Lista Verde", color: "#006837" }, { id: 1, nombre: "Lista Multicolor", color: "#d32f2f" } ];
+    
+    // Opciones de Graficos para que se ajusten perfecto
+    const commonChartOptions = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            datalabels: {
+                color: '#fff', font: { weight: 'bold', size: 14 },
+                formatter: (value, ctx) => {
+                    let sum = 0;
+                    ctx.chart.data.datasets[0].data.forEach(d => sum += d);
+                    return sum === 0 ? "0%" : (value*100 / sum).toFixed(1)+"%";
+                }
+            }, legend: { position: 'bottom' }
+        }, layout: { padding: 10 }
+    };
+
+    // ==================== AUTH Y ROLES ====================
+    function iniciarSesion() {
+        const e = document.getElementById('email').value.trim();
+        const p = document.getElementById('password').value;
+        const btn = document.querySelector('.login-box button');
+        
+        if(e === "" || p === "") {
+            alert("⚠️ Por favor, escribe un correo y una contraseña.");
+            return;
+        }
+
+        document.getElementById('loginError').innerText = "Verificando con Google Firebase...";
+        btn.innerText = "Cargando...";
+        btn.disabled = true;
+        
+        auth.signInWithEmailAndPassword(e, p).catch(err => {
+            console.error("Detalle del Error:", err);
+            let mensaje = "Error desconocido.";
+            if(err.code === 'auth/user-not-found') mensaje = "El usuario no existe. Créalo en Firebase.";
+            else if(err.code === 'auth/wrong-password') mensaje = "Contraseña incorrecta.";
+            else if(err.code === 'auth/invalid-email') mensaje = "Formato de correo inválido.";
+            else if(err.code === 'auth/operation-not-allowed') mensaje = "El acceso por correo NO está habilitado en Firebase.";
+            
+            alert("⛔ ERROR:\n" + mensaje + "\n\nCódigo técnico: " + err.code);
+            document.getElementById('loginError').innerText = mensaje;
+            btn.innerText = "INGRESAR";
+            btn.disabled = false;
+        });
+    }
+
+    function cerrarSesion() { auth.signOut().then(() => location.reload()); }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            const email = user.email.toLowerCase();
+            if(email.includes('admin')) userRole = 'admin';
+            else if(email.includes('consulta')) userRole = 'consulta';
+            else if(email.includes('escrutinio')) userRole = 'escrutinio';
+            else userRole = 'consulta'; // Por defecto
+
+            aplicarPermisos();
+            iniciarSincronizacion();
+        } else {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('loginError').innerText = "";
+            userRole = null;
+        }
+    });
+
+    function aplicarPermisos() {
+        document.getElementById('userRoleDisplay').innerText = userRole.toUpperCase();
+        
+        if(userRole !== 'admin') document.getElementById('moduloCargaExcel').classList.add('hidden');
+        else document.getElementById('moduloCargaExcel').classList.remove('hidden');
+
+        if(userRole === 'consulta' || userRole === 'escrutinio') {
+            document.getElementById('moduloCargaVotos').classList.add('hidden');
+        } else {
+            document.getElementById('moduloCargaVotos').classList.remove('hidden');
+        }
+
+        if(userRole === 'consulta') document.getElementById('btnMenuEscrutinio').classList.add('hidden');
+        else document.getElementById('btnMenuEscrutinio').classList.remove('hidden');
+        
+        if(userRole === 'consulta') document.getElementById('btnAñadirLista').classList.add('hidden');
+        else document.getElementById('btnAñadirLista').classList.remove('hidden');
+    }
+
+    // ==================== SINCRONIZACIÓN EN TIEMPO REAL ====================
+    function iniciarSincronizacion() {
+        showToast("Sincronizando con la nube...", "success");
+        
+        // 1. Escuchar Exceles
+        db.ref('excelData').on('value', snap => {
+            const data = snap.val();
+            if(data) {
+                if(data.padron) padronData = JSON.parse(data.padron);
+                else padronData = [];
+                
+                if(data.verdes) {
+                    votosVerdesData = JSON.parse(data.verdes);
+                    procesarVerdes(votosVerdesData);
+                } else votosVerdesData = [];
+            } else {
+                padronData = []; votosVerdesData = []; listaTomos.clear(); listaReferentes.clear();
+            }
+            actualizarUI();
+        });
+
+        // 2. Escuchar Votos de Mesa
+        db.ref('votos').on('value', snap => {
+            const data = snap.val() || {};
+            votosEmitidos = new Set(Object.keys(data));
+            actualizarUI();
+        });
+
+        // 3. Escuchar Configuración de Listas y Matriz
+        db.ref('escrutinio').on('value', snap => {
+            const data = snap.val();
+            if(data) {
+                if(data.config) listasConfig = data.config;
+                if(data.matriz && document.getElementById('containerTablaEscrutinio').style.display === 'block') {
+                    cargarMatrizEnUI(data.matriz);
+                }
+            }
+        });
+    }
+
+    // ==================== LÓGICA DE EXCEL ====================
+    function normalizarDatos(json) {
+        return json.map(row => {
+            const newRow = {};
+            Object.keys(row).forEach(key => {
+                const k = key.toString().trim().toLowerCase();
+                const val = row[key] !== undefined && row[key] !== null ? row[key] : "";
+                
+                if(k.match(/^(tomo|t|t\.|tº)$/)) newRow.Tomo = val;
+                else if(k.match(/^(folio|f|f\.|fº)$/)) newRow.Folio = val;
+                else if(k.includes('apellido') || k.includes('apenom')) newRow.Apellido = val;
+                else if(k.includes('nombre')) newRow.Nombre = val;
+                else if(k.includes('referente') || k.includes('ref')) newRow.Referente = val;
+            });
+            return { 
+                Tomo: newRow.Tomo || "?", 
+                Folio: newRow.Folio || "?", 
+                Apellido: newRow.Apellido || "", 
+                Nombre: newRow.Nombre || "", 
+                Referente: newRow.Referente || "" 
+            };
+        });
+    }
+
+    function obtenerReferentesArray(refString) {
+        if(!refString) return [];
+        return refString.toString().split(',').map(r => r.trim()).filter(r => r !== "");
+    }
+
+    function handleFile(input, type) {
+        if(userRole !== 'admin') return;
+        const file = input.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                let json = normalizarDatos(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]));
+                db.ref('excelData/' + type).set(JSON.stringify(json)).then(() => {
+                    showToast(`Archivo subido con éxito.`);
+                });
+            } catch(e) { alert("Error procesando Excel"); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function limpiarNube() {
+        if(confirm("🛑 ATENCIÓN: Esto borrará LOS EXCEL Y TODOS LOS VOTOS de la base de datos central.\n¿Estás completamente seguro?")) {
+            db.ref('/').remove().then(() => showToast("Base de datos limpia"));
+        }
+    }
+
+    function procesarTomos(data) {
+        listaTomos.clear();
+        data.forEach(r => { if(r.Tomo !== "?") listaTomos.add(r.Tomo); });
+        const sel = document.getElementById('inputTomo');
+        sel.innerHTML = '<option value="">Tomo</option>';
+        Array.from(listaTomos).sort((a,b)=>a-b).forEach(t => sel.innerHTML += `<option value="${t}">${t}</option>`);
+    }
+
+    function procesarVerdes(data) {
+        procesarTomos(data);
+        listaReferentes.clear();
+        data.forEach(r => {
+            obtenerReferentesArray(r.Referente).forEach(ref => listaReferentes.add(ref));
+        });
+        const sel = document.getElementById('filterReferente');
+        sel.innerHTML = '<option value="">Todos los Referentes</option>';
+        Array.from(listaReferentes).sort().forEach(r => sel.innerHTML += `<option value="${r}">${r}</option>`);
+    }
+
+    // ==================== LÓGICA DE VOTACIÓN ====================
+    function handleEnter(e) { if(e.key === 'Enter') registrarVoto(); }
+    
+    function registrarVoto() {
+        if(userRole === 'consulta' || userRole === 'escrutinio') return;
+        
+        const tomo = document.getElementById('inputTomo').value;
+        const folio = document.getElementById('inputFolio').value;
+        if(!tomo || !folio) return showToast("Faltan datos", "error");
+        
+        const key = `${tomo}-${folio}`;
+        
+        if(isCorrectionMode) {
+            if(votosEmitidos.has(key)) {
+                db.ref('votos/' + key).remove().then(()=>showToast("Voto eliminado"));
+            } else {
+                showToast("Ese voto no estaba cargado", "error");
+            }
+        } else {
+            if(padronData.length > 0) {
+                if(!padronData.some(p => p.Tomo == tomo && p.Folio == folio)) {
+                    return alert("⛔ ABOGADO NO HABILITADO EN PADRÓN");
+                }
+            }
+
+            if(votosEmitidos.has(key)) return showToast("¡YA VOTÓ!", "error");
+            
+            db.ref('votos/' + key).set(true).then(() => {
+                const esVerde = votosVerdesData.find(v => v.Tomo == tomo && v.Folio == folio);
+                if(esVerde) showToast(`Verde: ${esVerde.Apellido || ""}`);
+                else showToast("Voto Registrado");
+            });
+        }
+        
+        document.getElementById('inputFolio').value = '';
+        document.getElementById('inputFolio').focus();
+    }
+
+    function toggleCorrectionMode() {
+        isCorrectionMode = !isCorrectionMode;
+        const btn = document.getElementById('btnCorrection');
+        const main = document.getElementById('btnCargarVoto');
+        if(isCorrectionMode) {
+            btn.classList.add('btn-danger'); btn.classList.remove('btn-outline'); btn.innerText = "Terminar Corrección";
+            main.classList.replace('btn-primary','btn-danger'); main.innerText = "ELIMINAR";
+        } else {
+            btn.classList.remove('btn-danger'); btn.classList.add('btn-outline'); btn.innerText = "Corregir Voto";
+            main.classList.replace('btn-danger','btn-primary'); main.innerText = "CARGAR VOTO";
+        }
+    }
+
+    // ==================== RENDER Y TABLA ====================
+    function actualizarUI() {
+        let totalV = votosVerdesData.length;
+        let votaronV = votosVerdesData.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+        document.getElementById('statTotalPadron').innerText = padronData.length;
+        document.getElementById('statTotalVerdes').innerText = totalV;
+        document.getElementById('statYaVotaron').innerText = votaronV;
+        document.getElementById('statFaltan').innerText = totalV - votaronV;
+        renderTabla();
+    }
+
+    function renderTabla() {
+        const txt = document.getElementById('searchInput').value.toLowerCase();
+        const refSelected = document.getElementById('filterReferente').value;
+        const est = document.getElementById('filterEstado').value;
+        const tbody = document.querySelector('#tablaVotos tbody');
+        tbody.innerHTML = '';
+        
+        let filtered = votosVerdesData.filter(row => {
+            const yaVoto = votosEmitidos.has(`${row.Tomo}-${row.Folio}`);
+            if(est === 'voto' && !yaVoto) return false;
+            if(est === 'pendiente' && yaVoto) return false;
+            if(refSelected && !obtenerReferentesArray(row.Referente).includes(refSelected)) return false;
+            if(txt && !`${row.Tomo} ${row.Folio} ${row.Apellido}`.toLowerCase().includes(txt)) return false;
+            return true;
+        }).slice(0, 200);
+
+        if(filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Sin resultados</td></tr>';
+            return;
+        }
+
+        filtered.forEach(row => {
+            const yaVoto = votosEmitidos.has(`${row.Tomo}-${row.Folio}`);
+            const t = row.Tomo || "?";
+            const f = row.Folio || "?";
+            const nom = `${row.Apellido || ""}, ${row.Nombre || ""}`;
+            const ref = row.Referente || "-";
+
+            tbody.innerHTML += `<tr class="${yaVoto ? 'row-voted':''}">
+                <td class="${yaVoto ? 'status-voted':'status-pending'}">${yaVoto ? 'VOTÓ':'PENDIENTE'}</td>
+                <td>${t}</td><td>${f}</td><td>${nom}</td><td>${ref}</td></tr>`;
+        });
+    }
+
+    // ==================== GRÁFICOS PARCIALES / REFERENTES ====================
+    function abrirModalParciales() {
+        document.getElementById('modalParciales').style.display = 'flex';
+        const totalEmitidos = votosEmitidos.size;
+        const verdesVotaron = votosVerdesData.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+        const otros = totalEmitidos - verdesVotaron;
+        document.getElementById('parcialTotalEmitidos').innerText = totalEmitidos;
+        document.getElementById('parcialVerdes').innerText = verdesVotaron;
+        
+        const ctx = document.getElementById('chartParcial').getContext('2d');
+        if(chartParcialInstance) chartParcialInstance.destroy();
+        chartParcialInstance = new Chart(ctx, { 
+            type: 'pie', data: { labels: ['Lista Verde (Estimado)', 'Resto del Padrón'], datasets: [{ data: [verdesVotaron, otros], backgroundColor: ['#006837', '#e0e0e0'] }] },
+            options: commonChartOptions
+        });
+    }
+
+    function abrirModalReferentes() {
+        document.getElementById('modalReferentes').style.display = 'flex';
+        const tbody = document.querySelector('#tablaReferentes tbody');
+        tbody.innerHTML = '';
+        let stats = [];
+        listaReferentes.forEach(ref => {
+            const susVotos = votosVerdesData.filter(v => obtenerReferentesArray(v.Referente).includes(ref));
+            const total = susVotos.length;
+            const votaron = susVotos.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+            stats.push({ nombre: ref, total: total, votaron: votaron, faltan: total - votaron });
+        });
+        stats.sort((a,b) => b.faltan - a.faltan);
+        stats.forEach(s => { 
+            tbody.innerHTML += `<tr><td>${s.nombre}</td><td>${s.total}</td><td style="color:var(--primary-green); font-weight:bold">${s.votaron}</td><td style="color:var(--danger); font-weight:bold">${s.faltan}</td></tr>`; 
+        });
+    }
+
+    // ==================== ESCRUTINIO FINAL EN LA NUBE ====================
+    function abrirModalFinal() {
+        document.getElementById('modalFinal').style.display = 'flex';
+        renderConfigListas();
+    }
+
+    function renderConfigListas() {
+        const container = document.getElementById('configListasContainer');
+        container.innerHTML = '';
+        const disabled = userRole === 'consulta' ? 'disabled' : '';
+        
+        listasConfig.forEach((l, idx) => {
+            container.innerHTML += `
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="color" value="${l.color}" onchange="updateListaConfig(${idx}, 'color', this.value)" style="width:30px; height:30px; border:none;" ${disabled}>
+                    <input type="text" value="${l.nombre}" onchange="updateListaConfig(${idx}, 'nombre', this.value)" style="padding:5px; border:1px solid #ccc; width:120px;" ${disabled}>
+                </div>
+            `;
+        });
+    }
+
+    function agregarConfigLista() {
+        if(userRole === 'consulta') return;
+        listasConfig.push({ id: Date.now(), nombre: "Nueva Lista", color: "#999999" });
+        db.ref('escrutinio/config').set(listasConfig).then(() => renderConfigListas());
+    }
+    
+    function updateListaConfig(idx, field, val) { 
+        if(userRole === 'consulta') return;
+        listasConfig[idx][field] = val; 
+        db.ref('escrutinio/config').set(listasConfig);
+    }
+
+    function generarTablaEscrutinio() {
+        const thead = document.querySelector('#tablaEscrutinio thead');
+        const tbody = document.querySelector('#tablaEscrutinio tbody');
+        const disabled = userRole === 'consulta' ? 'disabled' : '';
+        
+        let headerHTML = `<tr><th>Tomo</th>`;
+        listasConfig.forEach(l => { headerHTML += `<th style="color:${l.color}">${l.nombre}</th>`; });
+        headerHTML += `<th>Blancos</th><th>Nulos</th><th>TOTAL</th></tr>`;
+        thead.innerHTML = headerHTML;
+
+        tbody.innerHTML = '';
+        let tomos = Array.from(listaTomos).sort((a,b)=>a-b);
+        if(tomos.length === 0) tomos = [1,2,3,4,5]; 
+
+        tomos.forEach(t => {
+            let row = `<tr><td><strong>Tomo ${t}</strong></td>`;
+            listasConfig.forEach((l, idx) => {
+                row += `<td><input type="number" class="input-escrutinio lista-val" data-idx="${idx}" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            });
+            row += `<td><input type="number" class="input-escrutinio blanco-val" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            row += `<td><input type="number" class="input-escrutinio nulo-val" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            row += `<td class="escrutinio-total row-total">0</td></tr>`;
+            tbody.innerHTML += row;
+        });
+
+        document.getElementById('containerTablaEscrutinio').style.display = 'block';
+        
+        db.ref('escrutinio/matriz').once('value').then(s => {
+            if(s.val()) cargarMatrizEnUI(s.val());
+        });
+    }
+
+    function calcRowTotal(input) {
+        const row = input.closest('tr');
+        let total = 0;
+        row.querySelectorAll('input').forEach(inp => total += (parseInt(inp.value)||0));
+        row.querySelector('.row-total').innerText = total;
+        
+        let grandTotal = 0;
+        document.querySelectorAll('.row-total').forEach(td => grandTotal += parseInt(td.innerText));
+        document.getElementById('totalGeneralEscrutinio').innerText = grandTotal;
+        
+        if(userRole !== 'consulta') syncMatrizFirebase();
+    }
+
+    function syncMatrizFirebase() {
+        let datos = [];
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach(tr => {
+            let fila = [];
+            tr.querySelectorAll('input').forEach(inp => fila.push(inp.value));
+            datos.push(fila);
+        });
+        db.ref('escrutinio/matriz').set(datos);
+    }
+
+    function cargarMatrizEnUI(datos) {
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach((tr, i) => {
+            if(datos[i]) {
+                let inps = tr.querySelectorAll('input');
+                datos[i].forEach((val, j) => { if(inps[j] && document.activeElement !== inps[j]) inps[j].value = val; });
+                let total = 0;
+                inps.forEach(inp => total += (parseInt(inp.value)||0));
+                tr.querySelector('.row-total').innerText = total;
+            }
+        });
+        let grandTotal = 0;
+        document.querySelectorAll('.row-total').forEach(td => grandTotal += parseInt(td.innerText));
+        document.getElementById('totalGeneralEscrutinio').innerText = grandTotal;
+    }
+
+    function calcularResultadoFinal() {
+        let totalesListas = new Array(listasConfig.length).fill(0);
+        let totalBlancos = 0; let totalNulos = 0;
+
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach(tr => {
+            tr.querySelectorAll('.lista-val').forEach(inp => { totalesListas[parseInt(inp.dataset.idx)] += (parseInt(inp.value)||0); });
+            totalBlancos += (parseInt(tr.querySelector('.blanco-val').value)||0);
+            totalNulos += (parseInt(tr.querySelector('.nulo-val').value)||0);
+        });
+
+        let totalGeneral = totalesListas.reduce((a,b)=>a+b, 0) + totalBlancos + totalNulos;
+
+        document.getElementById('moduloCargaEscrutinio').classList.add('hidden');
+        document.getElementById('stepResultadoFinal').classList.remove('hidden'); 
+
+        const labels = [...listasConfig.map(l => l.nombre), "Blancos", "Nulos"];
+        const data = [...totalesListas, totalBlancos, totalNulos];
+        const colors = [...listasConfig.map(l => l.color), "#cccccc", "#666666"];
+
+        const ctx = document.getElementById('chartFinal').getContext('2d');
+        if(chartFinalInstance) chartFinalInstance.destroy();
+        chartFinalInstance = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: data, backgroundColor: colors }] }, options: commonChartOptions });
+
+        let html = `Total Votos Escrutados: ${totalGeneral}<br>`;
+        labels.forEach((l, i) => {
+            let pct = totalGeneral > 0 ? ((data[i]/totalGeneral)*100).toFixed(2) : 0;
+            html += `${l}: ${data[i]} (${pct}%)<br>`;
+        });
+        document.getElementById('resumenFinalTexto').innerHTML = html;
+    }
+
+    function volverATabla() {
+        document.getElementById('stepResultadoFinal').classList.add('hidden');
+        document.getElementById('moduloCargaEscrutinio').classList.remove('hidden');
+    }
+
+    function showToast(msg, type="success") { const t=document.getElementById('toast'); t.innerText=msg; t.style.display='block'; t.style.background=type==="error"?"#d32f2f":"#333"; setTimeout(()=>t.style.display='none',3000); }
+</script>
+</body>
+</html>
