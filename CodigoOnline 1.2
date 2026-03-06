@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Electoral - Lista Verde</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root { 
+            --primary-green: #006837; 
+            --light-green: #e8f5e9; 
+            --accent-green: #4caf50;
+            --danger: #d32f2f; 
+            --text-dark: #2c3e50; 
+            --white: #ffffff;
+            --bg-body: #f4f7f6;
+        }
+        
+        body { font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; background-color: var(--bg-body); margin: 0; padding: 0; color: var(--text-dark); }
+        
+        /* ========================================================= */
+        /* NUEVO DISEÑO LOGIN MINIMALISTA Y MODERNO                  */
+        /* ========================================================= */
+        #loginOverlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: linear-gradient(135deg, #004d28 0%, #006837 100%); 
+            z-index: 5000; display: flex; align-items: center; justify-content: center; 
+        }
+        .login-box { 
+            background: var(--white); padding: 50px 40px; border-radius: 16px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; 
+            width: 100%; max-width: 380px; box-sizing: border-box; 
+        }
+        .login-icon { 
+            font-size: 3rem; color: var(--primary-green); margin-bottom: 15px; 
+        }
+        .login-title { 
+            font-size: 1.8rem; font-weight: 800; margin: 0; color: var(--text-dark); letter-spacing: -0.5px; 
+        }
+        .login-subtitle { 
+            font-size: 1.1rem; color: var(--primary-green); font-weight: 600; margin: 5px 0 30px 0; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .login-box input { 
+            width: 100%; padding: 14px 15px; margin: 8px 0 15px; 
+            border: 1px solid #e0e0e0; background: #f8faf9; border-radius: 8px; 
+            font-size: 1rem; box-sizing: border-box; transition: all 0.3s ease; 
+        }
+        .login-box input:focus { 
+            outline: none; border-color: var(--primary-green); background: #fff; 
+            box-shadow: 0 0 0 3px rgba(0, 104, 55, 0.15); 
+        }
+        .login-box button { 
+            width: 100%; padding: 15px; background: var(--primary-green); color: white; 
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer; 
+            margin-top: 10px; font-size: 1.1rem; letter-spacing: 0.5px; 
+            transition: all 0.3s ease; 
+        }
+        .login-box button:hover { 
+            background: #004d28; box-shadow: 0 8px 20px rgba(0, 104, 55, 0.3); transform: translateY(-2px); 
+        }
+        .login-box button:active { transform: translateY(0); box-shadow: none; }
+        /* ========================================================= */
+
+        /* Header y general */
+        header { background-color: white; border-bottom: 4px solid var(--primary-green); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo-placeholder { width: 50px; height: 50px; background-color: var(--light-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary-green); font-size: 20px; border: 2px solid var(--primary-green); }
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
+        .card-header { font-size: 1.1rem; font-weight: 600; color: var(--primary-green); margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Botones */
+        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary-green); color: white; }
+        .btn-primary:hover { background: #004d28; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary-green); color: var(--primary-green); }
+        .btn-outline:hover { background: var(--light-green); }
+        .btn-clean { background: #78909c; color: white; }
+        
+        /* UI */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--primary-green); color: white; padding: 20px 15px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .stat-card.secondary { background: white; color: var(--primary-green); border: 2px solid var(--primary-green); }
+        .stat-number { font-size: 2.2rem; font-weight: 800; display: block; line-height: 1.2; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        
+        .voting-interface { display: flex; gap: 15px; align-items: flex-end; background: var(--light-green); padding: 20px; border-radius: 8px; border: 1px solid #c8e6c9; }
+        .input-group { display: flex; flex-direction: column; flex: 1; gap: 5px;}
+        .input-group label { font-weight: bold; font-size: 0.85rem; color: var(--primary-green); }
+        .input-group input, .input-group select { padding: 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        .input-group input:focus, .input-group select:focus { border-color: var(--primary-green); }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; position: sticky; top: 0; color: #555; font-weight: 600; }
+        .status-voted { color: var(--primary-green); font-weight: bold; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem;}
+        .status-pending { color: var(--danger); font-weight: bold; background: #ffebee; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; }
+        tr.row-voted td { background-color: rgba(76, 175, 80, 0.05); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 95%; max-width: 800px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+        .modal-header { font-size: 1.3rem; font-weight: bold; color: var(--primary-green); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .chart-box { position: relative; height: 40vh; min-height: 300px; width: 100%; margin: 0 auto; }
+        .hidden { display: none !important; }
+        #liveBadge { background: #d32f2f; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; animation: blink 2s infinite; margin-left: 10px; vertical-align: middle; }
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
+        
+        /* Inputs escrutinio */
+        .config-listas { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
+        .input-escrutinio { width: 70px; padding: 8px 5px; border: 1px solid #ccc; text-align: center; border-radius: 4px; }
+        .escrutinio-total { font-weight: bold; background: #eee; }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay">
+    <div class="login-box">
+        <div class="login-icon"><i class="fas fa-vote-yea"></i></div>
+        <h2 class="login-title">Sistema Electoral</h2>
+        <p class="login-subtitle">Lista Verde</p>
+        
+        <input type="email" id="email" placeholder="Correo electrónico (Ej: admin@caq.com)">
+        <input type="password" id="password" placeholder="Contraseña" onkeypress="if(event.key === 'Enter') iniciarSesion()">
+        <button onclick="iniciarSesion()">INGRESAR AL SISTEMA</button>
+        <div id="loginError" style="color: #d32f2f; margin-top: 15px; font-size: 0.9rem; font-weight: 600;"></div>
+    </div>
+</div>
+
+<header>
+    <div class="logo-area">
+        <div class="logo-placeholder"><i class="fas fa-balance-scale"></i></div>
+        <div>
+            <h1 style="display:flex; align-items:center; margin-bottom:2px;">Elecciones - Lista Verde <span id="liveBadge">EN VIVO</span></h1>
+            <h2 style="margin:0;">Operador: <span id="userRoleDisplay" style="font-weight:bold; color:var(--primary-green);">Cargando...</span></h2>
+        </div>
+    </div>
+    <div>
+        <button class="btn btn-clean" onclick="cerrarSesion()"><i class="fas fa-sign-out-alt"></i> Salir</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card" style="background: #f1f8e9; border: 1px solid #c5e1a5;">
+        <div class="card-header" style="border:none; margin:0; padding:0;">
+            <span><i class="fas fa-chart-line"></i> Panel de Control y Estadísticas</span>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="abrirModalParciales()"><i class="fas fa-chart-pie"></i> Gráfico Parcial</button>
+                <button class="btn btn-primary" onclick="abrirModalReferentes()"><i class="fas fa-users"></i> Efectividad Referentes</button>
+                <button class="btn btn-danger" id="btnMenuEscrutinio" onclick="abrirModalFinal()"><i class="fas fa-flag-checkered"></i> ESCRUTINIO FINAL</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="moduloCargaExcel">
+        <div class="card-header">
+            <span><i class="fas fa-cloud-upload-alt"></i> Configuración Inicial (Solo Administrador)</span>
+            <button class="btn btn-outline" style="padding: 5px 10px; font-size:0.8rem;" onclick="limpiarNube()"><i class="fas fa-eraser"></i> Limpiar Nube</button>
+        </div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+            <label class="btn btn-outline" style="flex:1; padding:25px; border-style:dashed; text-align:center; cursor: pointer;">
+                <i class="fas fa-file-excel fa-2x" style="margin-bottom: 10px;"></i><br>Cargar Padrón Completo <input type="file" style="display:none" accept=".xlsx, .xls" onchange="handleFile(this, 'padron')">
+            </label>
+            <label class="btn btn-outline" style="flex:1; padding:25px; border-style:dashed; text-align:center; cursor: pointer;">
+                <i class="fas fa-file-excel fa-2x" style="margin-bottom: 10px;"></i><br>Cargar Padrón Lista Verde <input type="file" style="display:none" accept=".xlsx, .xls" onchange="handleFile(this, 'verdes')">
+            </label>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card secondary"><span class="stat-number" id="statTotalPadron">0</span><span class="stat-label">Padrón Total</span></div>
+        <div class="stat-card"><span class="stat-number" id="statTotalVerdes">0</span><span class="stat-label">Objetivo Verde</span></div>
+        <div class="stat-card secondary" style="border-color:var(--accent-green); color:var(--accent-green);"><span class="stat-number" id="statYaVotaron">0</span><span class="stat-label">Votantes Verdes</span></div>
+        <div class="stat-card" style="background: var(--danger);"><span class="stat-number" id="statFaltan">0</span><span class="stat-label">Faltan Votar</span></div>
+    </div>
+
+    <div class="card" id="moduloCargaVotos">
+        <div class="card-header">
+            <span><i class="fas fa-box-open"></i> Mesa de Entrada (Cargar Votante)</span>
+            <button class="btn btn-outline" onclick="toggleCorrectionMode()" id="btnCorrection"><i class="fas fa-edit"></i> Modo Corrección</button>
+        </div>
+        <div class="voting-interface">
+            <div class="input-group"><label>Mesa / Tomo</label><select id="inputTomo"><option value="">Seleccionar...</option></select></div>
+            <div class="input-group"><label>Número de Folio</label><input type="number" id="inputFolio" placeholder="Ej: 123" onkeypress="handleEnter(event)"></div>
+            <button class="btn btn-primary" id="btnCargarVoto" style="padding: 12px 25px; height: 100%;" onclick="registrarVoto()">REGISTRAR VOTO</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display:flex; gap:10px; margin-bottom: 15px; flex-wrap:wrap;">
+            <input type="text" id="searchInput" placeholder="Buscar por Apellido, Folio o Tomo..." onkeyup="renderTabla()" style="flex:1; padding:12px; border:1px solid #ccc; border-radius:6px; outline:none;">
+            <select id="filterReferente" onchange="renderTabla()" style="padding:12px; border:1px solid #ccc; border-radius:6px; outline:none;"><option value="">Todos los Referentes</option></select>
+            <select id="filterEstado" onchange="renderTabla()" style="padding:12px; border:1px solid #ccc; border-radius:6px; outline:none;"><option value="pendiente">Faltan Votar</option><option value="voto">Ya Votaron</option><option value="">Ver Todos</option></select>
+        </div>
+        <div style="overflow-x: auto; max-height: 500px; border: 1px solid #eee; border-radius: 6px;">
+            <table id="tablaVotos">
+                <thead><tr><th>Estado</th><th>Tomo</th><th>Folio</th><th>Apellido y Nombre</th><th>Referente(s)</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalParciales">
+    <div class="modal-content">
+        <div class="modal-header">Proyección de Resultados<button class="btn btn-outline" style="padding:4px 10px;" onclick="document.getElementById('modalParciales').style.display='none'"><i class="fas fa-times"></i></button></div>
+        <div style="text-align:center; margin-bottom: 15px;">
+            <h3 style="margin: 5px 0;">Total Emitidos en Mesa: <span id="parcialTotalEmitidos" style="color:#0277bd">0</span></h3>
+            <h4 style="margin: 5px 0; color: #666;">Votos Verdes Estimados: <span id="parcialVerdes" style="color:var(--primary-green); font-size: 1.3rem;">0</span></h4>
+        </div>
+        <div class="chart-box"><canvas id="chartParcial"></canvas></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalReferentes">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">Efectividad por Referente<button class="btn btn-outline" style="padding:4px 10px;" onclick="document.getElementById('modalReferentes').style.display='none'"><i class="fas fa-times"></i></button></div>
+        <div style="overflow-x:auto; border: 1px solid #eee; border-radius: 6px;">
+            <table id="tablaReferentes"><thead><tr><th>Referente</th><th>Padrón Total</th><th>Ya Votaron</th><th>Faltan</th></tr></thead><tbody></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalFinal">
+    <div class="modal-content">
+        <div class="modal-header">Escrutinio Final (Matriz Oficial)<button class="btn btn-outline" style="padding:4px 10px;" onclick="document.getElementById('modalFinal').style.display='none'"><i class="fas fa-times"></i></button></div>
+        
+        <div id="moduloCargaEscrutinio">
+            <p style="color: #555;">Configura las listas, la cantidad de tomos y abre la matriz. Todo se guarda automáticamente en la nube.</p>
+            
+            <div style="margin-bottom: 15px; background: #f8faf9; padding: 12px; border-radius: 8px; border: 1px solid #e0e0e0; display: inline-flex; align-items: center; gap: 10px;">
+                <label style="font-weight:bold; color: var(--primary-green);">Cantidad de Mesas/Tomos: </label>
+                <input type="number" id="inputCantidadTomos" value="5" min="1" style="padding:8px; border:1px solid #ccc; width: 80px; font-weight:bold; text-align:center; border-radius:6px; outline:none;">
+            </div>
+
+            <div class="config-listas" id="configListasContainer"></div>
+            
+            <button class="btn btn-outline" onclick="agregarConfigLista()" id="btnAñadirLista" style="margin-bottom: 10px;"><i class="fas fa-plus"></i> Añadir Lista Opositora</button>
+            <button class="btn btn-primary" onclick="generarTablaEscrutinio()" style="width: 100%; padding: 12px; font-size: 1.1rem;"><i class="fas fa-table"></i> ABRIR MATRIZ DE CARGA</button>
+            
+            <div id="containerTablaEscrutinio" style="display:none; margin-top:25px; overflow-x:auto;">
+                <table id="tablaEscrutinio" style="border: 1px solid #ccc;"><thead></thead><tbody></tbody></table>
+                <div style="background:#e8f5e9; padding:15px; text-align:right; margin-top:15px; border-radius: 6px; border: 1px solid #c8e6c9;">
+                    <h3 style="margin: 0; color: var(--primary-green);">Total General Escrutado: <span id="totalGeneralEscrutinio" style="font-size: 1.5rem;">0</span></h3>
+                </div>
+                <button class="btn btn-danger" style="width:100%; margin-top:20px; padding: 15px; font-size: 1.1rem; border-radius: 8px;" onclick="calcularResultadoFinal()"><i class="fas fa-chart-pie"></i> VER RESULTADO OFICIAL</button>
+            </div>
+        </div>
+
+        <div id="stepResultadoFinal" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+            <div class="chart-box"><canvas id="chartFinal"></canvas></div>
+            <div id="resumenFinalTexto" style="margin:20px 0; font-weight:bold; text-align:center; font-size:1.1rem; color: var(--text-dark); background: #f8f9fa; padding: 15px; border-radius: 8px;"></div>
+            <div style="margin-top:auto; padding-top:15px; border-top:1px solid #eee;">
+                <button class="btn btn-outline" style="width:100%; padding: 12px;" onclick="volverATabla()"><i class="fas fa-arrow-left"></i> Volver a la Matriz (Modificar Datos)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" style="position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; display:none; z-index:9000; font-weight:bold; box-shadow: 0 10px 25px rgba(0,0,0,0.2);"></div>
+
+<script>
+    // ==========================================
+    // CREDENCIALES DE FIREBASE
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyDLbdGI0iYGu2ADkdX_PMWWUhWG5Dxjucg",
+      authDomain: "eleccionescaq.firebaseapp.com",
+      databaseURL: "https://eleccionescaq-default-rtdb.firebaseio.com",
+      projectId: "eleccionescaq",
+      storageBucket: "eleccionescaq.firebasestorage.app",
+      messagingSenderId: "934632456972",
+      appId: "1:934632456972:web:5087dea53456aa2932ff29"
+    };
+    
+    // Inicializar Firebase
+    try {
+        firebase.initializeApp(firebaseConfig);
+    } catch(e) {
+        alert("Fallo crítico al cargar Firebase. Revisa tu conexión a internet.");
+    }
+    
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    Chart.register(ChartDataLabels);
+
+    // Variables Globales
+    let userRole = null; 
+    let padronData = [];
+    let votosVerdesData = [];
+    let votosEmitidos = new Set();
+    let listaTomos = new Set();
+    let listaReferentes = new Set();
+    let isCorrectionMode = false;
+    let chartParcialInstance = null;
+    let chartFinalInstance = null;
+    let listasConfig = [ { id: 0, nombre: "Lista Verde", color: "#006837" }, { id: 1, nombre: "Lista Multicolor", color: "#d32f2f" } ];
+    
+    // Opciones de Graficos
+    const commonChartOptions = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            datalabels: {
+                color: '#fff', font: { weight: 'bold', size: 15 },
+                formatter: (value, ctx) => {
+                    let sum = 0;
+                    ctx.chart.data.datasets[0].data.forEach(d => sum += d);
+                    return sum === 0 ? "0%" : (value*100 / sum).toFixed(1)+"%";
+                }
+            }, legend: { position: 'bottom', labels: { font: { size: 14 } } }
+        }, layout: { padding: 10 }
+    };
+
+    // ==================== AUTH Y ROLES ====================
+    function iniciarSesion() {
+        const e = document.getElementById('email').value.trim();
+        const p = document.getElementById('password').value;
+        const btn = document.querySelector('.login-box button');
+        
+        if(e === "" || p === "") {
+            alert("⚠️ Por favor, escribe un correo y una contraseña.");
+            return;
+        }
+
+        document.getElementById('loginError').innerText = "Verificando Credenciales...";
+        btn.innerText = "Conectando...";
+        btn.disabled = true;
+        
+        auth.signInWithEmailAndPassword(e, p).catch(err => {
+            let mensaje = "Error desconocido.";
+            if(err.code === 'auth/user-not-found') mensaje = "El usuario no existe.";
+            else if(err.code === 'auth/wrong-password') mensaje = "Contraseña incorrecta.";
+            else if(err.code === 'auth/invalid-email') mensaje = "Formato de correo inválido.";
+            
+            document.getElementById('loginError').innerText = mensaje;
+            btn.innerText = "INGRESAR AL SISTEMA";
+            btn.disabled = false;
+        });
+    }
+
+    function cerrarSesion() { auth.signOut().then(() => location.reload()); }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            const email = user.email.toLowerCase();
+            if(email.includes('admin')) userRole = 'admin';
+            else if(email.includes('consulta')) userRole = 'consulta';
+            else if(email.includes('escrutinio')) userRole = 'escrutinio';
+            else userRole = 'consulta'; 
+
+            aplicarPermisos();
+            iniciarSincronizacion();
+        } else {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('loginError').innerText = "";
+            userRole = null;
+        }
+    });
+
+    function aplicarPermisos() {
+        // Renombrar visualmente para que sea mas amigable
+        let rolVisual = userRole;
+        if(userRole === 'admin') rolVisual = 'Administrador General';
+        if(userRole === 'consulta') rolVisual = 'Consulta (Solo Lectura)';
+        if(userRole === 'escrutinio') rolVisual = 'Mesa de Escrutinio';
+        
+        document.getElementById('userRoleDisplay').innerText = rolVisual;
+        
+        if(userRole !== 'admin') document.getElementById('moduloCargaExcel').classList.add('hidden');
+        else document.getElementById('moduloCargaExcel').classList.remove('hidden');
+
+        if(userRole === 'consulta' || userRole === 'escrutinio') {
+            document.getElementById('moduloCargaVotos').classList.add('hidden');
+        } else {
+            document.getElementById('moduloCargaVotos').classList.remove('hidden');
+        }
+
+        if(userRole === 'consulta') {
+            document.getElementById('btnAñadirLista').classList.add('hidden');
+            document.getElementById('inputCantidadTomos').disabled = true;
+        } else {
+            document.getElementById('btnAñadirLista').classList.remove('hidden');
+            document.getElementById('inputCantidadTomos').disabled = false;
+        }
+    }
+
+    // ==================== SINCRONIZACIÓN EN TIEMPO REAL ====================
+    function iniciarSincronizacion() {
+        showToast("Conectado al servidor ✅", "success");
+        
+        db.ref('excelData').on('value', snap => {
+            const data = snap.val();
+            if(data) {
+                if(data.padron) padronData = JSON.parse(data.padron);
+                else padronData = [];
+                
+                if(data.verdes) {
+                    votosVerdesData = JSON.parse(data.verdes);
+                    procesarVerdes(votosVerdesData);
+                } else votosVerdesData = [];
+            } else {
+                padronData = []; votosVerdesData = []; listaTomos.clear(); listaReferentes.clear();
+            }
+            actualizarUI();
+        });
+
+        db.ref('votos').on('value', snap => {
+            const data = snap.val() || {};
+            votosEmitidos = new Set(Object.keys(data));
+            actualizarUI();
+        });
+
+        db.ref('escrutinio').on('value', snap => {
+            const data = snap.val();
+            if(data) {
+                if(data.config) listasConfig = data.config;
+                if(data.cantidadTomos) document.getElementById('inputCantidadTomos').value = data.cantidadTomos;
+                if(data.matriz && document.getElementById('containerTablaEscrutinio').style.display === 'block') {
+                    cargarMatrizEnUI(data.matriz);
+                }
+            }
+        });
+    }
+
+    // ==================== LÓGICA DE EXCEL ====================
+    function normalizarDatos(json) {
+        return json.map(row => {
+            const newRow = {};
+            Object.keys(row).forEach(key => {
+                const k = key.toString().trim().toLowerCase();
+                const val = row[key] !== undefined && row[key] !== null ? row[key] : "";
+                
+                if(k.match(/^(tomo|t|t\.|tº)$/)) newRow.Tomo = val;
+                else if(k.match(/^(folio|f|f\.|fº)$/)) newRow.Folio = val;
+                else if(k.includes('apellido') || k.includes('apenom')) newRow.Apellido = val;
+                else if(k.includes('nombre')) newRow.Nombre = val;
+                else if(k.includes('referente') || k.includes('ref')) newRow.Referente = val;
+            });
+            return { 
+                Tomo: newRow.Tomo || "?", 
+                Folio: newRow.Folio || "?", 
+                Apellido: newRow.Apellido || "", 
+                Nombre: newRow.Nombre || "", 
+                Referente: newRow.Referente || "" 
+            };
+        });
+    }
+
+    function obtenerReferentesArray(refString) {
+        if(!refString) return [];
+        return refString.toString().split(',').map(r => r.trim()).filter(r => r !== "");
+    }
+
+    function handleFile(input, type) {
+        if(userRole !== 'admin') return;
+        const file = input.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                let json = normalizarDatos(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]));
+                db.ref('excelData/' + type).set(JSON.stringify(json)).then(() => {
+                    showToast(`Archivo subido exitosamente.`);
+                });
+            } catch(e) { alert("Error procesando Excel"); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function limpiarNube() {
+        if(confirm("🛑 ATENCIÓN: Esto borrará TODOS LOS EXCEL Y LOS VOTOS del servidor central.\n¿Estás completamente seguro?")) {
+            db.ref('/').remove().then(() => showToast("Servidor reiniciado por completo."));
+        }
+    }
+
+    function procesarTomos(data) {
+        listaTomos.clear();
+        data.forEach(r => { if(r.Tomo !== "?") listaTomos.add(r.Tomo); });
+        const sel = document.getElementById('inputTomo');
+        sel.innerHTML = '<option value="">Seleccionar...</option>';
+        Array.from(listaTomos).sort((a,b)=>a-b).forEach(t => sel.innerHTML += `<option value="${t}">${t}</option>`);
+    }
+
+    function procesarVerdes(data) {
+        procesarTomos(data);
+        listaReferentes.clear();
+        data.forEach(r => {
+            obtenerReferentesArray(r.Referente).forEach(ref => listaReferentes.add(ref));
+        });
+        const sel = document.getElementById('filterReferente');
+        sel.innerHTML = '<option value="">Todos los Referentes</option>';
+        Array.from(listaReferentes).sort().forEach(r => sel.innerHTML += `<option value="${r}">${r}</option>`);
+    }
+
+    // ==================== LÓGICA DE VOTACIÓN ====================
+    function handleEnter(e) { if(e.key === 'Enter') registrarVoto(); }
+    
+    function registrarVoto() {
+        if(userRole === 'consulta' || userRole === 'escrutinio') return;
+        
+        const tomo = document.getElementById('inputTomo').value;
+        const folio = document.getElementById('inputFolio').value;
+        if(!tomo || !folio) return showToast("Por favor ingresa Tomo y Folio", "error");
+        
+        const key = `${tomo}-${folio}`;
+        
+        if(isCorrectionMode) {
+            if(votosEmitidos.has(key)) {
+                db.ref('votos/' + key).remove().then(()=>showToast("Voto eliminado del registro"));
+            } else {
+                showToast("Este abogado no figura como votante", "error");
+            }
+        } else {
+            if(padronData.length > 0) {
+                if(!padronData.some(p => p.Tomo == tomo && p.Folio == folio)) {
+                    return alert("⛔ ABOGADO NO HABILITADO EN PADRÓN GENERAL");
+                }
+            }
+
+            if(votosEmitidos.has(key)) return showToast("¡ESTE ABOGADO YA VOTÓ!", "error");
+            
+            db.ref('votos/' + key).set(true).then(() => {
+                const esVerde = votosVerdesData.find(v => v.Tomo == tomo && v.Folio == folio);
+                if(esVerde) showToast(`Voto Verde: ${esVerde.Apellido || ""}`);
+                else showToast("Voto Estándar Registrado");
+            });
+        }
+        
+        document.getElementById('inputFolio').value = '';
+        document.getElementById('inputFolio').focus();
+    }
+
+    function toggleCorrectionMode() {
+        isCorrectionMode = !isCorrectionMode;
+        const btn = document.getElementById('btnCorrection');
+        const main = document.getElementById('btnCargarVoto');
+        if(isCorrectionMode) {
+            btn.classList.add('btn-danger'); btn.classList.remove('btn-outline'); btn.innerHTML = "<i class='fas fa-times'></i> Salir de Corrección";
+            main.classList.replace('btn-primary','btn-danger'); main.innerHTML = "ELIMINAR ESTE VOTO";
+        } else {
+            btn.classList.remove('btn-danger'); btn.classList.add('btn-outline'); btn.innerHTML = "<i class='fas fa-edit'></i> Modo Corrección";
+            main.classList.replace('btn-danger','btn-primary'); main.innerHTML = "REGISTRAR VOTO";
+        }
+    }
+
+    // ==================== RENDER Y TABLA ====================
+    function actualizarUI() {
+        let totalV = votosVerdesData.length;
+        let votaronV = votosVerdesData.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+        document.getElementById('statTotalPadron').innerText = padronData.length;
+        document.getElementById('statTotalVerdes').innerText = totalV;
+        document.getElementById('statYaVotaron').innerText = votaronV;
+        document.getElementById('statFaltan').innerText = totalV - votaronV;
+        renderTabla();
+    }
+
+    function renderTabla() {
+        const txt = document.getElementById('searchInput').value.toLowerCase();
+        const refSelected = document.getElementById('filterReferente').value;
+        const est = document.getElementById('filterEstado').value;
+        const tbody = document.querySelector('#tablaVotos tbody');
+        tbody.innerHTML = '';
+        
+        let filtered = votosVerdesData.filter(row => {
+            const yaVoto = votosEmitidos.has(`${row.Tomo}-${row.Folio}`);
+            if(est === 'voto' && !yaVoto) return false;
+            if(est === 'pendiente' && yaVoto) return false;
+            if(refSelected && !obtenerReferentesArray(row.Referente).includes(refSelected)) return false;
+            if(txt && !`${row.Tomo} ${row.Folio} ${row.Apellido}`.toLowerCase().includes(txt)) return false;
+            return true;
+        }).slice(0, 300); // Muestra 300 filas máximo para no trabar el navegador web
+
+        if(filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px; color:#666;">No se encontraron resultados para esta búsqueda.</td></tr>';
+            return;
+        }
+
+        filtered.forEach(row => {
+            const yaVoto = votosEmitidos.has(`${row.Tomo}-${row.Folio}`);
+            const t = row.Tomo || "?";
+            const f = row.Folio || "?";
+            const nom = `<strong style="color:var(--text-dark)">${row.Apellido || ""}</strong>, ${row.Nombre || ""}`;
+            const ref = row.Referente || "-";
+
+            let icon = yaVoto ? '<i class="fas fa-check-circle"></i> VOTÓ' : '<i class="fas fa-clock"></i> PENDIENTE';
+            tbody.innerHTML += `<tr class="${yaVoto ? 'row-voted':''}">
+                <td><span class="${yaVoto ? 'status-voted':'status-pending'}">${icon}</span></td>
+                <td style="font-weight:bold">${t}</td><td>${f}</td><td>${nom}</td><td style="color:#666">${ref}</td></tr>`;
+        });
+    }
+
+    // ==================== GRÁFICOS PARCIALES / REFERENTES ====================
+    function abrirModalParciales() {
+        document.getElementById('modalParciales').style.display = 'flex';
+        const totalEmitidos = votosEmitidos.size;
+        const verdesVotaron = votosVerdesData.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+        const otros = totalEmitidos - verdesVotaron;
+        document.getElementById('parcialTotalEmitidos').innerText = totalEmitidos;
+        document.getElementById('parcialVerdes').innerText = verdesVotaron;
+        
+        const ctx = document.getElementById('chartParcial').getContext('2d');
+        if(chartParcialInstance) chartParcialInstance.destroy();
+        chartParcialInstance = new Chart(ctx, { 
+            type: 'pie', data: { labels: ['Lista Verde (Estimado)', 'Resto del Padrón'], datasets: [{ data: [verdesVotaron, otros], backgroundColor: ['#006837', '#e0e0e0'] }] },
+            options: commonChartOptions
+        });
+    }
+
+    function abrirModalReferentes() {
+        document.getElementById('modalReferentes').style.display = 'flex';
+        const tbody = document.querySelector('#tablaReferentes tbody');
+        tbody.innerHTML = '';
+        let stats = [];
+        listaReferentes.forEach(ref => {
+            const susVotos = votosVerdesData.filter(v => obtenerReferentesArray(v.Referente).includes(ref));
+            const total = susVotos.length;
+            const votaron = susVotos.filter(v => votosEmitidos.has(`${v.Tomo}-${v.Folio}`)).length;
+            stats.push({ nombre: ref, total: total, votaron: votaron, faltan: total - votaron });
+        });
+        stats.sort((a,b) => b.faltan - a.faltan);
+        stats.forEach(s => { 
+            tbody.innerHTML += `<tr><td style="font-weight:bold">${s.nombre}</td><td>${s.total}</td><td style="color:var(--primary-green); font-weight:bold; font-size:1.1rem">${s.votaron}</td><td style="color:var(--danger); font-weight:bold; font-size:1.1rem">${s.faltan}</td></tr>`; 
+        });
+    }
+
+    // ==================== ESCRUTINIO FINAL EN LA NUBE ====================
+    function abrirModalFinal() {
+        document.getElementById('modalFinal').style.display = 'flex';
+        renderConfigListas();
+    }
+
+    function renderConfigListas() {
+        const container = document.getElementById('configListasContainer');
+        container.innerHTML = '';
+        const disabled = userRole === 'consulta' ? 'disabled' : '';
+        
+        listasConfig.forEach((l, idx) => {
+            container.innerHTML += `
+                <div style="display:flex; align-items:center; gap:5px; background: white; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                    <input type="color" value="${l.color}" onchange="updateListaConfig(${idx}, 'color', this.value)" style="width:25px; height:25px; border:none; padding:0; cursor:pointer;" ${disabled}>
+                    <input type="text" value="${l.nombre}" onchange="updateListaConfig(${idx}, 'nombre', this.value)" style="padding:5px; border:none; width:120px; font-weight:bold; outline:none;" ${disabled}>
+                </div>
+            `;
+        });
+    }
+
+    function agregarConfigLista() {
+        if(userRole === 'consulta') return;
+        listasConfig.push({ id: Date.now(), nombre: "Nueva Lista", color: "#999999" });
+        db.ref('escrutinio/config').set(listasConfig).then(() => renderConfigListas());
+    }
+    
+    function updateListaConfig(idx, field, val) { 
+        if(userRole === 'consulta') return;
+        listasConfig[idx][field] = val; 
+        db.ref('escrutinio/config').set(listasConfig);
+    }
+
+    function generarTablaEscrutinio() {
+        const thead = document.querySelector('#tablaEscrutinio thead');
+        const tbody = document.querySelector('#tablaEscrutinio tbody');
+        const disabled = userRole === 'consulta' ? 'disabled' : '';
+        
+        let headerHTML = `<tr><th>Mesa</th>`;
+        listasConfig.forEach(l => { headerHTML += `<th style="color:${l.color}; text-align:center;">${l.nombre}</th>`; });
+        headerHTML += `<th style="text-align:center; color:#666;">Blancos</th><th style="text-align:center; color:#666;">Nulos</th><th style="text-align:center;">TOTAL</th></tr>`;
+        thead.innerHTML = headerHTML;
+
+        tbody.innerHTML = '';
+        
+        let cantTomos = parseInt(document.getElementById('inputCantidadTomos').value) || 5;
+        if(userRole !== 'consulta') db.ref('escrutinio/cantidadTomos').set(cantTomos);
+
+        for(let i = 1; i <= cantTomos; i++) {
+            let row = `<tr><td><strong>Mesa/Tomo ${i}</strong></td>`;
+            listasConfig.forEach((l, idx) => {
+                row += `<td style="text-align:center;"><input type="number" class="input-escrutinio lista-val" data-idx="${idx}" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            });
+            row += `<td style="text-align:center;"><input type="number" class="input-escrutinio blanco-val" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            row += `<td style="text-align:center;"><input type="number" class="input-escrutinio nulo-val" value="" onkeyup="calcRowTotal(this)" onchange="calcRowTotal(this)" ${disabled}></td>`;
+            row += `<td class="escrutinio-total row-total" style="text-align:center; font-size:1.1rem;">0</td></tr>`;
+            tbody.innerHTML += row;
+        }
+
+        document.getElementById('containerTablaEscrutinio').style.display = 'block';
+        
+        db.ref('escrutinio/matriz').once('value').then(s => {
+            if(s.val()) cargarMatrizEnUI(s.val());
+        });
+    }
+
+    function calcRowTotal(input) {
+        const row = input.closest('tr');
+        let total = 0;
+        row.querySelectorAll('input').forEach(inp => total += (parseInt(inp.value)||0));
+        row.querySelector('.row-total').innerText = total;
+        
+        let grandTotal = 0;
+        document.querySelectorAll('.row-total').forEach(td => grandTotal += parseInt(td.innerText));
+        document.getElementById('totalGeneralEscrutinio').innerText = grandTotal;
+        
+        if(userRole !== 'consulta') syncMatrizFirebase();
+    }
+
+    function syncMatrizFirebase() {
+        let datos = [];
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach(tr => {
+            let fila = [];
+            tr.querySelectorAll('input').forEach(inp => fila.push(inp.value));
+            datos.push(fila);
+        });
+        db.ref('escrutinio/matriz').set(datos);
+    }
+
+    function cargarMatrizEnUI(datos) {
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach((tr, i) => {
+            if(datos[i]) {
+                let inps = tr.querySelectorAll('input');
+                datos[i].forEach((val, j) => { if(inps[j] && document.activeElement !== inps[j]) inps[j].value = val; });
+                let total = 0;
+                inps.forEach(inp => total += (parseInt(inp.value)||0));
+                tr.querySelector('.row-total').innerText = total;
+            }
+        });
+        let grandTotal = 0;
+        document.querySelectorAll('.row-total').forEach(td => grandTotal += parseInt(td.innerText));
+        document.getElementById('totalGeneralEscrutinio').innerText = grandTotal;
+    }
+
+    function calcularResultadoFinal() {
+        let totalesListas = new Array(listasConfig.length).fill(0);
+        let totalBlancos = 0; let totalNulos = 0;
+
+        document.querySelectorAll('#tablaEscrutinio tbody tr').forEach(tr => {
+            tr.querySelectorAll('.lista-val').forEach(inp => { totalesListas[parseInt(inp.dataset.idx)] += (parseInt(inp.value)||0); });
+            totalBlancos += (parseInt(tr.querySelector('.blanco-val').value)||0);
+            totalNulos += (parseInt(tr.querySelector('.nulo-val').value)||0);
+        });
+
+        let totalGeneral = totalesListas.reduce((a,b)=>a+b, 0) + totalBlancos + totalNulos;
+
+        document.getElementById('moduloCargaEscrutinio').classList.add('hidden');
+        document.getElementById('stepResultadoFinal').classList.remove('hidden'); 
+
+        const labels = [...listasConfig.map(l => l.nombre), "Blancos", "Nulos"];
+        const data = [...totalesListas, totalBlancos, totalNulos];
+        const colors = [...listasConfig.map(l => l.color), "#cccccc", "#666666"];
+
+        const ctx = document.getElementById('chartFinal').getContext('2d');
+        if(chartFinalInstance) chartFinalInstance.destroy();
+        chartFinalInstance = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: data, backgroundColor: colors }] }, options: commonChartOptions });
+
+        let html = `Total Escrutado: ${totalGeneral} Votos<br><br>`;
+        labels.forEach((l, i) => {
+            let pct = totalGeneral > 0 ? ((data[i]/totalGeneral)*100).toFixed(2) : 0;
+            html += `<span style="color:${colors[i]}">●</span> ${l}: ${data[i]} (${pct}%)<br>`;
+        });
+        document.getElementById('resumenFinalTexto').innerHTML = html;
+    }
+
+    function volverATabla() {
+        document.getElementById('stepResultadoFinal').classList.add('hidden');
+        document.getElementById('moduloCargaEscrutinio').classList.remove('hidden');
+    }
+
+    function showToast(msg, type="success") { 
+        const t=document.getElementById('toast'); 
+        t.innerHTML = type === "error" ? `<i class="fas fa-exclamation-triangle"></i> ${msg}` : `<i class="fas fa-check-circle"></i> ${msg}`; 
+        t.style.display='block'; 
+        t.style.background=type==="error"?"#d32f2f":"#2c3e50"; 
+        setTimeout(()=>t.style.display='none', 3000); 
+    }
+</script>
+</body>
+</html>
